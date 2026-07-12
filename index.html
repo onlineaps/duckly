@@ -8,6 +8,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0F9D77">
+<script>
+  (function(){
+    try{
+      const saved = localStorage.getItem('duckly-theme');
+      if(saved){ document.documentElement.setAttribute('data-theme', saved); }
+    }catch(e){}
+  })();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
@@ -541,7 +549,11 @@
 <body>
 
 <!-- AUTH SCREEN -->
-<div class="auth-wrapper" id="authWrapper">
+<div class="auth-wrapper" id="loadingScreen">
+  <div class="spinner" style="width:26px; height:26px; border-color:rgba(15,157,119,0.25); border-top-color:var(--accent);"></div>
+</div>
+
+<div class="auth-wrapper hidden" id="authWrapper">
   <div class="auth-card">
     <div class="auth-brand display">D</div>
     <div class="auth-title display" id="authTitle">Welcome back</div>
@@ -861,8 +873,8 @@
       } else {
         const { data, error } = await sb.auth.signInWithPassword({ email, password: passcode });
         if(error) throw error;
-        const { data: profile } = await sb.from('profiles').select('username').eq('id', data.user.id).single();
-        await onAuthSuccess(data.user, profile ? profile.username : username);
+        const { data: profile } = await sb.from('profiles').select('username, theme').eq('id', data.user.id).single();
+        await onAuthSuccess(data.user, profile ? profile.username : username, profile ? profile.theme : '');
       }
     } catch(err){
       let msg = err.message || 'Something went wrong.';
@@ -874,13 +886,21 @@
     }
   }
 
-  async function onAuthSuccess(user, username){
+  async function onAuthSuccess(user, username, savedTheme){
     currentUser = user;
     currentUsername = username;
+    document.getElementById('loadingScreen').classList.add('hidden');
     document.getElementById('authWrapper').classList.add('hidden');
     document.getElementById('appShell').classList.remove('hidden');
     document.getElementById('settingsUsername').textContent = username;
     document.getElementById('settingsAvatar').textContent = username.charAt(0).toUpperCase();
+
+    // Apply the theme saved in Supabase (source of truth across devices).
+    // Falls back to whatever localStorage guessed pre-login if Supabase has none yet.
+    if(savedTheme !== undefined && savedTheme !== null){
+      applyTheme(savedTheme, false);
+    }
+
     await loadNotes();
   }
 
@@ -899,8 +919,11 @@
   async function checkExistingSession(){
     const { data } = await sb.auth.getSession();
     if(data.session){
-      const { data: profile } = await sb.from('profiles').select('username').eq('id', data.session.user.id).single();
-      await onAuthSuccess(data.session.user, profile ? profile.username : 'You');
+      const { data: profile } = await sb.from('profiles').select('username, theme').eq('id', data.session.user.id).single();
+      await onAuthSuccess(data.session.user, profile ? profile.username : 'You', profile ? profile.theme : '');
+    } else {
+      document.getElementById('loadingScreen').classList.add('hidden');
+      document.getElementById('authWrapper').classList.remove('hidden');
     }
   }
   checkExistingSession();
@@ -1216,19 +1239,37 @@
   }
 
   function openSettings(){
+    const active = document.documentElement.getAttribute('data-theme') || '';
+    document.querySelectorAll('.theme-swatch').forEach(el => {
+      el.classList.toggle('active', (el.dataset.theme || '') === active);
+    });
     document.getElementById('settingsModal').classList.remove('hidden');
   }
   function closeSettings(){
     document.getElementById('settingsModal').classList.add('hidden');
   }
-  function setTheme(themeName, swatchEl){
+  function applyTheme(themeName, syncToSupabase, swatchEl){
     if(themeName){
       document.documentElement.setAttribute('data-theme', themeName);
     } else {
       document.documentElement.removeAttribute('data-theme');
     }
+    try{ localStorage.setItem('duckly-theme', themeName); }catch(e){}
+
     document.querySelectorAll('.theme-swatch').forEach(el => el.classList.remove('active'));
-    swatchEl.classList.add('active');
+    if(!swatchEl){
+      swatchEl = document.querySelector('.theme-swatch[data-theme="' + themeName + '"]');
+    }
+    if(swatchEl) swatchEl.classList.add('active');
+
+    if(syncToSupabase && currentUser){
+      sb.from('profiles').update({ theme: themeName }).eq('id', currentUser.id)
+        .then(({ error }) => { if(error) showToast('Could not sync theme'); });
+    }
+  }
+
+  function setTheme(themeName, swatchEl){
+    applyTheme(themeName, true, swatchEl);
   }
 
   // Esc closes any open modal (generic — works for settings and any future modal)
