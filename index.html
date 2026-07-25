@@ -474,6 +474,24 @@
   .bubble-dropdown button:hover{background:var(--bg);}
   .bubble-dropdown button.danger{color:var(--danger);}
 
+  .attach-menu{
+    position:absolute; z-index:300; min-width:190px;
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    box-shadow:var(--shadow-lg); overflow:hidden; padding:6px;
+    animation:dropdownIn .15s cubic-bezier(0, 0, 0.2, 1);
+  }
+  .attach-menu button{
+    display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+    padding:11px 12px; font-size:14px; font-weight:600; border-radius:10px;
+    background:none; border:none; cursor:pointer; color:var(--ink); font-family:inherit;
+  }
+  .attach-menu button:hover{background:var(--bg);}
+  .attach-menu .attach-menu-icon{
+    width:34px; height:34px; border-radius:10px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .attach-menu .attach-menu-icon svg{width:18px; height:18px;}
+
   .staged-preview{
     width:100%; max-width:720px; margin:0 auto;
     display:flex; align-items:center; gap:14px;
@@ -497,10 +515,11 @@
   .attach-btn:active{transform:scale(0.92);}
   .attach-btn svg{width:20px; height:20px;}
   .composer textarea{
-    flex:1; min-height:46px; max-height:140px; border-radius:24px; border:1px solid var(--border);
+    flex:1; min-height:46px; max-height:200px; border-radius:24px; border:1px solid var(--border);
     padding:12px 20px; font-size:15px; font-family:inherit; outline:none; background:var(--surface);
     resize:none; line-height:1.4; overflow-y:auto; white-space:pre-wrap; word-break:break-word;
-    color:var(--ink); box-shadow: var(--shadow-sm); transition: border-color .15s ease, box-shadow .15s ease;
+    color:var(--ink); box-shadow: var(--shadow-sm);
+    transition: border-color .15s ease, box-shadow .15s ease, height .12s ease;
   }
   .composer textarea::placeholder{color:var(--faint);}
   .composer textarea:focus{border-color:var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);}
@@ -552,6 +571,20 @@
   .card .file-icon{margin-bottom:16px;}
   .card .name{font-size:14.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:24px; color: var(--ink);}
   .card .size{font-size:12.5px; color:var(--muted); margin-top:4px;}
+  .card-actions{
+    position:absolute; top:12px; right:12px;
+    display:flex; gap:6px; z-index:1;
+  }
+  .card-icon-btn{
+    width:28px; height:28px; border-radius:8px; border:none; flex-shrink:0;
+    background:var(--bg); color:var(--muted);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    transition: all .15s ease;
+  }
+  .card-icon-btn:hover{background:var(--accent-soft); color:var(--accent);}
+  .card-icon-btn.danger:hover{background:var(--danger); color:#fff;}
+  .card-icon-btn svg{width:14px; height:14px;}
+
   .card-del-btn{
     position:absolute; top:12px; right:12px;
     width:28px; height:28px; border-radius:8px; border:none;
@@ -571,7 +604,7 @@
     transition:border-color .2s ease, transform .2s ease; position:relative;
   }
   .note-card:hover{border-color:var(--accent); transform: translateY(-2px);}
-  .note-card .title{font-size:16px; font-weight:600; margin-bottom:6px; padding-right:28px; color: var(--ink);}
+  .note-card .title{font-size:16px; font-weight:600; margin-bottom:6px; padding-right:104px; color: var(--ink);}
   .note-card .snippet{font-size:14px; color:var(--muted); margin-bottom:12px; line-height:1.5;}
   .note-card .date{font-size:12px; color:var(--faint); font-weight:500;}
 
@@ -925,6 +958,9 @@
           <h1 class="display" id="topbar-title">Chat</h1>
           <div class="sub" id="topbar-sub">Message yourself, keep it safe</div>
         </div>
+        <button class="icon-btn" id="chatOptionsBtn" onclick="openChatOptionsMenu(this)" title="Chat options" style="flex-shrink:0;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+        </button>
         <button class="icon-btn" onclick="quickLogout()" title="Logout" style="flex-shrink:0;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
         </button>
@@ -964,7 +1000,9 @@
 
         <div class="composer">
           <input type="file" id="fileInput" style="display:none" onchange="handleFileSelect(event)">
-          <button class="attach-btn" onclick="document.getElementById('fileInput').click()">
+          <input type="file" id="galleryInput" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
+          <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleFileSelect(event)">
+          <button class="attach-btn" id="attachBtn" onclick="openAttachMenu(this)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           </button>
           <textarea rows="1" placeholder="Message yourself…" id="chat-input" oninput="autoGrow(this)" onkeydown="handleComposerKey(event)"></textarea>
@@ -1045,6 +1083,9 @@
             </button>
             <input class="title-field display" id="editor-title" placeholder="Untitled note" oninput="scheduleNoteSave()">
             <button class="btn btn-ghost" id="noteSaveBtn" onclick="manualSaveNote()" style="padding:8px 14px; font-size:13px; flex-shrink:0;">Save</button>
+            <button class="back-btn" onclick="copyCurrentNote()" title="Copy note">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
             <button class="back-btn" onclick="deleteCurrentNote()" title="Delete note">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/></svg>
             </button>
@@ -1100,6 +1141,11 @@
         <span class="settings-row-value" id="settingsRowTheme">Teal · Light</span>
         <svg class="settings-row-chevron" id="appearanceChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
       </button>
+      <button class="settings-row" onclick="toggleStoragePanel()">
+        <span class="settings-row-label">Storage</span>
+        <span class="settings-row-value" id="settingsRowStorage">— MB used</span>
+        <svg class="settings-row-chevron" id="storageChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
     </div>
 
     <div class="appearance-panel hidden" id="appearancePanel">
@@ -1128,6 +1174,37 @@
         <span class="theme-list-item-label">Cream · Light</span>
         <svg class="theme-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
       </div>
+    </div>
+
+    <div class="appearance-panel hidden" id="storagePanel" style="padding:16px;">
+      <div style="display:flex; height:8px; border-radius:6px; overflow:hidden; margin-bottom:14px; background:var(--bg);">
+        <div id="storageBarChat" style="background:var(--accent); height:100%;"></div>
+        <div id="storageBarCloud" style="background:#F0B429; height:100%;"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; margin-bottom:8px;">
+        <span style="display:flex; align-items:center; gap:7px; color:var(--muted);"><span style="width:9px; height:9px; border-radius:50%; background:var(--accent); display:inline-block;"></span>Chat</span>
+        <span style="font-weight:600;" id="storageBreakdownChat">0 MB</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; margin-bottom:14px;">
+        <span style="display:flex; align-items:center; gap:7px; color:var(--muted);"><span style="width:9px; height:9px; border-radius:50%; background:#F0B429; display:inline-block;"></span>My Cloud</span>
+        <span style="font-weight:600;" id="storageBreakdownCloud">0 MB</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--faint); padding-top:12px; border-top:1px solid var(--border);">
+        <span>Total (shared 500MB pool)</span>
+        <span id="storageBreakdownTotal">0 MB</span>
+      </div>
+    </div>
+
+    <div class="settings-label">Data</div>
+    <div class="settings-list">
+      <button class="settings-row" onclick="exportBackup()">
+        <span class="settings-row-label">Export Backup</span>
+        <span class="settings-row-value">Notes + Chat text as .txt</span>
+      </button>
+      <button class="settings-row" onclick="handleClearChatHistory()">
+        <span class="settings-row-label" style="color:var(--danger);">Clear Chat History</span>
+        <span class="settings-row-value">Text only, files kept</span>
+      </button>
     </div>
   </div>
 </div>
@@ -1635,16 +1712,27 @@
       const title = note.title && note.title.trim() ? note.title : 'Untitled note';
       const snippet = note.body && note.body.trim() ? note.body.slice(0,90) : 'No content yet';
       card.innerHTML = `
-        <button class="card-del-btn" title="Delete note">${TRASH_ICON}</button>
+        <div class="card-actions">
+          <button class="card-icon-btn" data-act="edit" title="Edit note">${EDIT_ICON}</button>
+          <button class="card-icon-btn" data-act="copy" title="Copy note">${COPY_ICON}</button>
+          <button class="card-icon-btn danger" data-act="delete" title="Delete note">${TRASH_ICON}</button>
+        </div>
         <div class="title">${escapeHtml(title)}</div>
         <div class="snippet">${escapeHtml(snippet)}</div>
         <div class="date">Modified ${timeAgo(note.modified_at)}</div>
       `;
       card.addEventListener('click', (e) => {
-        if(e.target.closest('.card-del-btn')) return;
+        if(e.target.closest('.card-actions')) return;
         openNote(note.id);
       });
-      card.querySelector('.card-del-btn').onclick = (e) => { e.stopPropagation(); deleteNoteFromList(note.id); };
+      card.querySelector('[data-act="edit"]').onclick = (e) => { e.stopPropagation(); openNote(note.id); };
+      card.querySelector('[data-act="copy"]').onclick = (e) => {
+        e.stopPropagation();
+        const fullText = (note.title ? note.title + '\n\n' : '') + (note.body || '');
+        navigator.clipboard.writeText(fullText).catch(()=>{});
+        showToast('Note copied');
+      };
+      card.querySelector('[data-act="delete"]').onclick = (e) => { e.stopPropagation(); deleteNoteFromList(note.id); };
       list.appendChild(card);
     });
   }
@@ -1705,6 +1793,15 @@
     await saveCurrentNote();
     btn.textContent = 'Saved ✓';
     setTimeout(() => { btn.textContent = original; }, 1200);
+  }
+
+  function copyCurrentNote(){
+    if(!currentNoteId) return;
+    const title = document.getElementById('editor-title').value;
+    const body = document.getElementById('editor-body').value;
+    const fullText = (title ? title + '\n\n' : '') + body;
+    navigator.clipboard.writeText(fullText).catch(()=>{});
+    showToast('Note copied');
   }
 
   async function deleteCurrentNote(){
@@ -1768,12 +1865,13 @@
     document.getElementById('panelsTrack').style.transform = `translate3d(-${(currentTabIndex * 33.3333)}%, 0, 0)`;
     document.getElementById('topbar-title').textContent = titles[tab];
     document.getElementById('topbar-sub').textContent = subs[tab];
+    document.getElementById('chatOptionsBtn').classList.toggle('hidden', tab !== 'chat');
     if(tab !== 'notes'){ closeNote(); }
   }
 
   function autoGrow(el){
     el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
   }
 
   function handleComposerKey(event){
@@ -1797,6 +1895,7 @@
   const CHECK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
   const TRASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/></svg>';
   const CHEVRON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+  const EDIT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
 
   function escapeHtml(str){
     return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -1967,6 +2066,8 @@
   const MAX_FILE_SIZE = 300 * 1024 * 1024;
   const TOTAL_QUOTA = 500 * 1024 * 1024;
   let totalUsedBytes = 0;
+  let chatUsedBytes = 0;
+  let cloudUsedBytes = 0;
   let stagedFile = null;
 
   async function loadVaultItems(){
@@ -1991,10 +2092,38 @@
       sb.from('vault_items').select('file_size').eq('user_id', currentUser.id).eq('type', 'file'),
       sb.from('cloud_files').select('file_size').eq('user_id', currentUser.id)
     ]);
-    let total = 0;
-    (vaultRes.data || []).forEach(r => { total += r.file_size || 0; });
-    (cloudRes.data || []).forEach(r => { total += r.file_size || 0; });
-    updateStorageUI(total);
+    let chatBytes = 0, cloudBytes = 0;
+    (vaultRes.data || []).forEach(r => { chatBytes += r.file_size || 0; });
+    (cloudRes.data || []).forEach(r => { cloudBytes += r.file_size || 0; });
+    chatUsedBytes = chatBytes;
+    cloudUsedBytes = cloudBytes;
+    updateStorageUI(chatBytes + cloudBytes);
+    updateStorageBreakdownUI();
+  }
+
+  function updateStorageBreakdownUI(){
+    const chatMB = chatUsedBytes / (1024 * 1024);
+    const cloudMB = cloudUsedBytes / (1024 * 1024);
+    const totalMB = (chatUsedBytes + cloudUsedBytes) / (1024 * 1024);
+    const fmt = (mb) => mb < 10 ? mb.toFixed(1) : Math.round(mb);
+
+    const rowEl = document.getElementById('settingsRowStorage');
+    if(rowEl) rowEl.textContent = fmt(totalMB) + ' MB used';
+
+    const chatLbl = document.getElementById('storageBreakdownChat');
+    const cloudLbl = document.getElementById('storageBreakdownCloud');
+    const totalLbl = document.getElementById('storageBreakdownTotal');
+    if(chatLbl) chatLbl.textContent = fmt(chatMB) + ' MB';
+    if(cloudLbl) cloudLbl.textContent = fmt(cloudMB) + ' MB';
+    if(totalLbl) totalLbl.textContent = fmt(totalMB) + ' MB / 500 MB';
+
+    const quotaMB = TOTAL_QUOTA / (1024 * 1024);
+    const chatPct = Math.min(100, (chatMB / quotaMB) * 100);
+    const cloudPct = Math.min(100, (cloudMB / quotaMB) * 100);
+    const barChat = document.getElementById('storageBarChat');
+    const barCloud = document.getElementById('storageBarCloud');
+    if(barChat) barChat.style.width = chatPct + '%';
+    if(barCloud) barCloud.style.width = cloudPct + '%';
   }
 
   function updateStorageUI(usedBytes){
@@ -2622,6 +2751,9 @@
     document.getElementById('settingsRowUsername').textContent = currentUsername;
     document.getElementById('appearancePanel').classList.add('hidden');
     document.getElementById('appearanceChevron').classList.remove('rotated');
+    document.getElementById('storagePanel').classList.add('hidden');
+    document.getElementById('storageChevron').classList.remove('rotated');
+    updateStorageBreakdownUI();
     document.getElementById('settingsModal').classList.remove('hidden');
     pushBackEntry(closeSettings);
   }
@@ -2629,9 +2761,134 @@
     document.getElementById('settingsModal').classList.add('hidden');
   }
   function toggleAppearancePanel(){
+    document.getElementById('storagePanel').classList.add('hidden');
+    document.getElementById('storageChevron').classList.remove('rotated');
     document.getElementById('appearancePanel').classList.toggle('hidden');
     document.getElementById('appearanceChevron').classList.toggle('rotated');
   }
+
+  function toggleStoragePanel(){
+    document.getElementById('appearancePanel').classList.add('hidden');
+    document.getElementById('appearanceChevron').classList.remove('rotated');
+    document.getElementById('storagePanel').classList.toggle('hidden');
+    document.getElementById('storageChevron').classList.toggle('rotated');
+  }
+
+  async function exportBackup(){
+    showToast('Preparing backup…');
+    try{
+      const [notesRes, vaultRes] = await Promise.all([
+        sb.from('notes').select('*').eq('user_id', currentUser.id).order('created_at', { ascending:true }),
+        sb.from('vault_items').select('*').eq('user_id', currentUser.id).eq('type', 'text').order('created_at', { ascending:true })
+      ]);
+
+      let out = 'DUCKLY BACKUP\n';
+      out += 'Username: ' + currentUsername + '\n';
+      out += 'Exported: ' + new Date().toLocaleString() + '\n';
+      out += '(Text content only — files are not included in this export)\n';
+      out += '\n' + '='.repeat(40) + '\nNOTES\n' + '='.repeat(40) + '\n\n';
+
+      (notesRes.data || []).forEach(note => {
+        out += '--- ' + (note.title || 'Untitled') + ' ---\n';
+        out += 'Modified: ' + new Date(note.modified_at).toLocaleString() + '\n\n';
+        out += (note.body || '') + '\n\n';
+      });
+
+      out += '\n' + '='.repeat(40) + '\nCHAT HISTORY\n' + '='.repeat(40) + '\n\n';
+      (vaultRes.data || []).forEach(item => {
+        out += '[' + new Date(item.created_at).toLocaleString() + '] ' + (item.content || '') + '\n';
+      });
+
+      const blob = new Blob([out], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'duckly-backup-' + Date.now() + '.txt';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      showToast('Backup downloaded');
+    } catch(err){
+      showToast('Could not create backup');
+    }
+  }
+
+  async function handleClearChatHistory(){
+    if(!(await showConfirm('All text messages will be permanently deleted. Files will NOT be affected.', 'Clear chat history?', 'Clear'))) return;
+    const { error } = await sb.from('vault_items').delete().eq('user_id', currentUser.id).eq('type', 'text');
+    if(error){ showToast('Could not clear history'); return; }
+    showToast('Chat history cleared');
+    await loadVaultItems();
+  }
+
+  function openChatOptionsMenu(anchorEl){
+    closeBubbleDropdown();
+    const rect = anchorEl.getBoundingClientRect();
+    const menu = document.createElement('div');
+    menu.className = 'bubble-dropdown';
+    menu.innerHTML = '<button data-act="clear" class="danger">Clear Chat History</button>';
+    document.body.appendChild(menu);
+
+    const menuWidth = menu.offsetWidth;
+    let left = rect.right - menuWidth;
+    if(left < 8) left = 8;
+    menu.style.top = (rect.bottom + 6 + window.scrollY) + 'px';
+    menu.style.left = left + 'px';
+
+    menu.querySelector('[data-act="clear"]').onclick = () => {
+      closeBubbleDropdown();
+      handleClearChatHistory();
+    };
+
+    _openDropdown = menu;
+    setTimeout(() => document.addEventListener('click', closeBubbleDropdownOnOutsideClick, true), 0);
+  }
+
+  function openAttachMenu(anchorEl){
+    closeBubbleDropdown();
+    const rect = anchorEl.getBoundingClientRect();
+    const menu = document.createElement('div');
+    menu.className = 'attach-menu';
+    menu.innerHTML = `
+      <button data-act="gallery">
+        <span class="attach-menu-icon" style="background:var(--accent-soft); color:var(--accent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        </span>
+        Gallery
+      </button>
+      <button data-act="camera">
+        <span class="attach-menu-icon" style="background:#FDE7F0; color:#D6417A;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>
+        </span>
+        Camera
+      </button>
+      <button data-act="document">
+        <span class="attach-menu-icon" style="background:#E3EEFC; color:#2F6FE4;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+        </span>
+        Document
+      </button>
+    `;
+    document.body.appendChild(menu);
+
+    const menuWidth = menu.offsetWidth;
+    const menuHeight = menu.offsetHeight;
+    let left = rect.left;
+    if(left + menuWidth > window.innerWidth - 8) left = window.innerWidth - menuWidth - 8;
+    if(left < 8) left = 8;
+    menu.style.left = left + 'px';
+    menu.style.top = (rect.top + window.scrollY - menuHeight - 8) + 'px';
+
+    menu.querySelector('[data-act="gallery"]').onclick = () => { closeBubbleDropdown(); document.getElementById('galleryInput').click(); };
+    menu.querySelector('[data-act="camera"]').onclick = () => { closeBubbleDropdown(); document.getElementById('cameraInput').click(); };
+    menu.querySelector('[data-act="document"]').onclick = () => { closeBubbleDropdown(); document.getElementById('fileInput').click(); };
+
+    _openDropdown = menu;
+    setTimeout(() => document.addEventListener('click', closeBubbleDropdownOnOutsideClick, true), 0);
+  }
+
+
   function applyTheme(themeName, syncToSupabase, itemEl){
     if(themeName){
       document.documentElement.setAttribute('data-theme', themeName);
