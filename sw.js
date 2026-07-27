@@ -1,4 +1,4 @@
-const CACHE_NAME = 'duckly-shell-v30';
+const CACHE_NAME = 'duckly-shell-v31';
 const SHELL_FILES = [
   './index.html',
   './manifest.json',
