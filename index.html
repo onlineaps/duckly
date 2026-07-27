@@ -525,6 +525,24 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="textPreviewModal" style="background:rgba(15,23,42,0.9); padding:20px;" onclick="if(event.target===this) closeTextPreview()">
+  <div class="modal-card" style="max-width:520px; width:100%; display:flex; flex-direction:column; gap:16px;" onclick="event.stopPropagation()">
+    <div class="modal-header" style="margin-bottom:0;">
+      <h3 id="textPreviewName" style="font-size:15px; word-break:break-all; padding-right:12px;">file.txt</h3>
+      <button class="modal-close" onclick="closeTextPreview()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <textarea id="textPreviewArea" style="width:100%; height:320px; resize:vertical; font-family:'JetBrains Mono', monospace; font-size:13.5px; line-height:1.6; padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--bg); color:var(--ink); outline:none; box-sizing:border-box;"></textarea>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn btn-ghost" id="textPreviewCopyBtn" style="flex:1; min-width:100px; justify-content:center;">Copy</button>
+      <button class="btn btn-ghost" id="textPreviewPasteBtn" style="flex:1; min-width:100px; justify-content:center;">Paste</button>
+      <button class="btn btn-ghost" id="textPreviewClearBtn" style="flex:1; min-width:100px; justify-content:center;">Clear</button>
+      <button class="btn btn-primary" id="textPreviewDlBtn" style="flex:1; min-width:100px; justify-content:center;">Download</button>
+    </div>
+  </div>
+</div>
+
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/script.js"></script>
