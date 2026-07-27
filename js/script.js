@@ -813,6 +813,14 @@
       `;
       const dlBtnEl = wrap.querySelector('.dl-btn');
       dlBtnEl.onclick = (e) => { e.stopPropagation(); downloadFile('vault-files', item.file_path, name, dlBtnEl); };
+
+      if(ext.toLowerCase() === 'txt'){
+        wrap.style.cursor = 'pointer';
+        wrap.addEventListener('click', (e) => {
+          if(e.target.closest('.dl-btn') || e.target.closest('.bubble-chevron')) return;
+          openTextPreview('vault-files', item.file_path, name);
+        });
+      }
     }
 
     const contextFn = () => ({ type: 'file', id: item.id, wrap, filePath: item.file_path, fileSize: item.file_size });
@@ -1055,6 +1063,60 @@
     dismissTop();
   }
 
+  async function openTextPreview(bucket, path, filename){
+    const { data, error } = await sb.storage.from(bucket).createSignedUrl(path, 3600);
+    if(error){ showToast('Could not load file'); return; }
+    let text = '';
+    try{
+      const res = await fetch(data.signedUrl);
+      text = await res.text();
+    } catch(e){
+      showToast('Could not load file');
+      return;
+    }
+    document.getElementById('textPreviewName').textContent = filename;
+    document.getElementById('textPreviewArea').value = text;
+    document.getElementById('textPreviewDlBtn').onclick = () => downloadFile(bucket, path, filename, document.getElementById('textPreviewDlBtn'));
+    document.getElementById('textPreviewModal').classList.remove('hidden');
+    pushBackEntry(hideTextPreview);
+  }
+
+  function hideTextPreview(){
+    document.getElementById('textPreviewModal').classList.add('hidden');
+    document.getElementById('textPreviewArea').value = '';
+  }
+
+  function closeTextPreview(){
+    dismissTop();
+  }
+
+  document.getElementById('textPreviewCopyBtn').onclick = async () => {
+    try{
+      await navigator.clipboard.writeText(document.getElementById('textPreviewArea').value);
+      showToast('Copied');
+    } catch(e){
+      showToast('Copy failed');
+    }
+  };
+
+  document.getElementById('textPreviewPasteBtn').onclick = async () => {
+    try{
+      const clip = await navigator.clipboard.readText();
+      const ta = document.getElementById('textPreviewArea');
+      const start = ta.selectionStart, end = ta.selectionEnd;
+      ta.value = ta.value.slice(0, start) + clip + ta.value.slice(end);
+      ta.selectionStart = ta.selectionEnd = start + clip.length;
+      ta.focus();
+    } catch(e){
+      showToast('Paste failed — clipboard permission needed');
+    }
+  };
+
+  document.getElementById('textPreviewClearBtn').onclick = () => {
+    document.getElementById('textPreviewArea').value = '';
+    document.getElementById('textPreviewArea').focus();
+  };
+
   async function downloadFile(bucket, path, filename, btnEl){
     const { data, error } = await sb.storage.from(bucket).createSignedUrl(path, 60);
     if(error){ showToast('Could not get download link'); return; }
@@ -1199,6 +1261,8 @@
         if(e.target.closest('.card-del-btn')) return;
         if(isImage){
           openImagePreview('cloud-files', file.file_path, file.file_name);
+        } else if(ext.toLowerCase() === 'txt'){
+          openTextPreview('cloud-files', file.file_path, file.file_name);
         } else {
           downloadFile('cloud-files', file.file_path, file.file_name, card.querySelector('.file-icon'));
         }
@@ -1407,7 +1471,8 @@
            !document.getElementById('recoveryModal').classList.contains('hidden') ||
            !document.getElementById('changeUsernameModal').classList.contains('hidden') ||
            !document.getElementById('changePasscodeModal').classList.contains('hidden') ||
-           !document.getElementById('lightboxModal').classList.contains('hidden');
+           !document.getElementById('lightboxModal').classList.contains('hidden') ||
+           !document.getElementById('textPreviewModal').classList.contains('hidden');
   }
 
   function setupSwipeNavigation(){
