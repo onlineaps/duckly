@@ -818,7 +818,7 @@
         wrap.style.cursor = 'pointer';
         wrap.addEventListener('click', (e) => {
           if(e.target.closest('.dl-btn') || e.target.closest('.bubble-chevron')) return;
-          openTextPreview('vault-files', item.file_path, name);
+          openTextPreview('vault-files', item.file_path, name, 'vault_items', item.id);
         });
       }
     }
@@ -1063,32 +1063,74 @@
     dismissTop();
   }
 
-  async function openTextPreview(bucket, path, filename){
-    const { data, error } = await sb.storage.from(bucket).createSignedUrl(path, 3600);
-    if(error){ showToast('Could not load file'); return; }
-    let text = '';
-    try{
-      const res = await fetch(data.signedUrl);
-      text = await res.text();
-    } catch(e){
-      showToast('Could not load file');
-      return;
-    }
-    document.getElementById('textPreviewName').textContent = filename;
-    document.getElementById('textPreviewArea').value = text;
+  let _textPreviewCtx = null; // { bucket, path, filename, table, id }
+
+  function openTextPreview(bucket, path, filename, table, id){
+    _textPreviewCtx = { bucket, path, filename, table, id };
+
+    const nameEl = document.getElementById('textPreviewName');
+    nameEl.textContent = filename;
+    const ta = document.getElementById('textPreviewArea');
+    ta.value = 'Loading…';
+    ta.disabled = true;
+
     document.getElementById('textPreviewDlBtn').onclick = () => downloadFile(bucket, path, filename, document.getElementById('textPreviewDlBtn'));
+
+    // Open instantly — don't wait on the network before showing the modal.
     document.getElementById('textPreviewModal').classList.remove('hidden');
     pushBackEntry(hideTextPreview);
+
+    (async () => {
+      const { data, error } = await sb.storage.from(bucket).createSignedUrl(path, 3600);
+      if(error){ ta.value = ''; ta.disabled = false; showToast('Could not load file'); return; }
+      try{
+        const res = await fetch(data.signedUrl);
+        ta.value = await res.text();
+      } catch(e){
+        showToast('Could not load file');
+      } finally {
+        ta.disabled = false;
+      }
+    })();
   }
 
   function hideTextPreview(){
     document.getElementById('textPreviewModal').classList.add('hidden');
     document.getElementById('textPreviewArea').value = '';
+    cancelTextPreviewRename();
+    _textPreviewCtx = null;
   }
 
   function closeTextPreview(){
     dismissTop();
   }
+
+  async function saveTextPreview(){
+    if(!_textPreviewCtx) return;
+    const { bucket, path, table, id } = _textPreviewCtx;
+    const ta = document.getElementById('textPreviewArea');
+    const text = ta.value;
+    const blob = new Blob([text], { type: 'text/plain' });
+
+    showToast('Saving…');
+    const { error } = await sb.storage.from(bucket).upload(path, blob, { upsert: true, contentType: 'text/plain' });
+    if(error){ showToast('Save failed'); return; }
+
+    if(table && id){
+      await sb.from(table).update({ file_size: blob.size }).eq('id', id);
+      calculateAndUpdateStorage();
+    }
+    showToast('Saved');
+  }
+
+  document.addEventListener('keydown', (e) => {
+    const modal = document.getElementById('textPreviewModal');
+    if(!modal || modal.classList.contains('hidden')) return;
+    if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){
+      e.preventDefault();
+      saveTextPreview();
+    }
+  });
 
   document.getElementById('textPreviewCopyBtn').onclick = async () => {
     try{
@@ -1116,6 +1158,50 @@
     document.getElementById('textPreviewArea').value = '';
     document.getElementById('textPreviewArea').focus();
   };
+
+  /* ---- Rename (edits DB display name only, storage path unchanged) ---- */
+  function cancelTextPreviewRename(){
+    const nameEl = document.getElementById('textPreviewName');
+    const input = document.getElementById('textPreviewNameInput');
+    if(input) input.remove();
+    if(nameEl) nameEl.style.display = '';
+  }
+
+  function startTextPreviewRename(){
+    if(!_textPreviewCtx) return;
+    const nameEl = document.getElementById('textPreviewName');
+    if(document.getElementById('textPreviewNameInput')) return; // already editing
+    nameEl.style.display = 'none';
+    const input = document.createElement('input');
+    input.id = 'textPreviewNameInput';
+    input.value = _textPreviewCtx.filename;
+    input.style.cssText = 'font-size:15px; font-weight:700; font-family:inherit; width:100%; border:1px solid var(--border); border-radius:8px; padding:6px 10px; background:var(--bg); color:var(--ink); outline:none;';
+    nameEl.parentNode.insertBefore(input, nameEl);
+    input.focus();
+    input.select();
+
+    const commit = async () => {
+      const newName = input.value.trim();
+      if(!newName || newName === _textPreviewCtx.filename){ cancelTextPreviewRename(); return; }
+      const { table, id } = _textPreviewCtx;
+      const { error } = await sb.from(table).update({ file_name: newName }).eq('id', id);
+      if(error){ showToast('Rename failed'); cancelTextPreviewRename(); return; }
+      _textPreviewCtx.filename = newName;
+      nameEl.textContent = newName;
+      cancelTextPreviewRename();
+      showToast('Renamed');
+      if(table === 'cloud_files') loadCloudView();
+      else if(table === 'vault_items') loadVaultItems();
+    };
+
+    input.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter'){ e.preventDefault(); commit(); }
+      if(e.key === 'Escape'){ e.preventDefault(); cancelTextPreviewRename(); }
+    });
+    input.addEventListener('blur', commit);
+  }
+
+
 
   async function downloadFile(bucket, path, filename, btnEl){
     const { data, error } = await sb.storage.from(bucket).createSignedUrl(path, 60);
@@ -1262,7 +1348,7 @@
         if(isImage){
           openImagePreview('cloud-files', file.file_path, file.file_name);
         } else if(ext.toLowerCase() === 'txt'){
-          openTextPreview('cloud-files', file.file_path, file.file_name);
+          openTextPreview('cloud-files', file.file_path, file.file_name, 'cloud_files', file.id);
         } else {
           downloadFile('cloud-files', file.file_path, file.file_name, card.querySelector('.file-icon'));
         }
