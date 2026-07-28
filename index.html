@@ -230,7 +230,7 @@
   <!-- MAIN -->
   <div class="main">
     <div class="topbar">
-      <div class="topbar-row">
+      <div class="topbar-row" id="normalTopbarRow">
         <button class="icon-btn topbar-settings" onclick="openSettings()" style="margin-right:10px; flex-shrink:0;" title="Settings">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
         </button>
@@ -243,6 +243,17 @@
         </button>
         <button class="icon-btn" onclick="quickLogout()" title="Logout" style="flex-shrink:0;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+        </button>
+      </div>
+      <div class="topbar-row hidden" id="selectionTopbarRow" style="align-items:center;">
+        <button class="icon-btn" onclick="exitSelectionMode()" title="Cancel" style="flex-shrink:0;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+        <div style="flex:1; min-width:0;">
+          <h1 class="display" id="selectionCountLabel">1 selected</h1>
+        </div>
+        <button class="icon-btn" onclick="deleteSelectedItems()" title="Delete selected" style="flex-shrink:0;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/></svg>
         </button>
       </div>
       <div class="storage-pill">
@@ -279,8 +290,8 @@
         </div>
 
         <div class="composer">
-          <input type="file" id="fileInput" style="display:none" onchange="handleFileSelect(event)">
-          <input type="file" id="galleryInput" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
+          <input type="file" id="fileInput" multiple style="display:none" onchange="handleFileSelect(event)">
+          <input type="file" id="galleryInput" accept="image/*" multiple style="display:none" onchange="handleFileSelect(event)">
           <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleFileSelect(event)">
           <button class="attach-btn" id="attachBtn" onclick="openAttachMenu(this)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
