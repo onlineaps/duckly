@@ -476,6 +476,7 @@
           <button class="card-icon-btn" data-act="copy" title="Copy note">${COPY_ICON}</button>
           <button class="card-icon-btn danger" data-act="delete" title="Delete note">${TRASH_ICON}</button>
         </div>
+        <div class="select-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
         <div class="title">${escapeHtml(title)}</div>
         <div class="snippet">${escapeHtml(snippet)}</div>
         <div class="date">Modified ${timeAgo(note.modified_at)}</div>
@@ -492,6 +493,8 @@
         showToast('Note copied');
       };
       card.querySelector('[data-act="delete"]').onclick = (e) => { e.stopPropagation(); deleteNoteFromList(note.id); };
+      const noteContextFn = () => ({ module:'notes', id: note.id, wrap: card });
+      attachLongPressActions(card, noteContextFn);
       list.appendChild(card);
     });
   }
@@ -617,6 +620,7 @@
   function switchTab(tab){
     const newIndex = TAB_ORDER.indexOf(tab);
     if(newIndex === -1) return;
+    if(selectionMode) exitSelectionMode();
     currentTabIndex = newIndex;
 
     document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
@@ -743,11 +747,16 @@
     chevron.title = 'Copy';
     chevron.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
 
+    const checkbox = document.createElement('div');
+    checkbox.className = 'select-checkbox';
+    checkbox.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
     wrap.appendChild(textEl);
     wrap.appendChild(timeEl);
     wrap.appendChild(chevron);
+    wrap.appendChild(checkbox);
 
-    const contextFn = () => ({ type: 'text', id: item.id, wrap, text });
+    const contextFn = () => ({ module:'chat', type: 'text', id: item.id, wrap, text });
     attachLongPressActions(wrap, contextFn);
     attachChevron(chevron, contextFn);
     return wrap;
@@ -774,6 +783,7 @@
         <button class="photo-dl-btn" title="Download">${DL_ICON}</button>
         <button class="bubble-chevron" title="Options" style="bottom:8px; left:8px; right:auto;">${CHEVRON_ICON}</button>
         <div class="photo-time">${time}</div>
+        <div class="select-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
       `;
       const imgEl = wrap.querySelector('.photo-thumb');
       const shimmer = wrap.querySelector('.photo-shimmer');
@@ -810,6 +820,7 @@
         </div>
         <button class="dl-btn" title="Download">${DL_ICON}</button>
         <button class="bubble-chevron" title="Options">${CHEVRON_ICON}</button>
+        <div class="select-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
       `;
       const dlBtnEl = wrap.querySelector('.dl-btn');
       dlBtnEl.onclick = (e) => { e.stopPropagation(); downloadFile('vault-files', item.file_path, name, dlBtnEl); };
@@ -823,7 +834,7 @@
       }
     }
 
-    const contextFn = () => ({ type: 'file', id: item.id, wrap, filePath: item.file_path, fileSize: item.file_size });
+    const contextFn = () => ({ module:'chat', type: 'file', id: item.id, wrap, filePath: item.file_path, fileSize: item.file_size });
     attachLongPressActions(wrap, contextFn);
     const chevronEl = wrap.querySelector('.bubble-chevron');
     if(chevronEl) attachChevron(chevronEl, contextFn);
@@ -1388,6 +1399,7 @@
       card.className = 'card';
       card.innerHTML = `
         <button class="card-del-btn" title="Delete file">${TRASH_ICON}</button>
+        <div class="select-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
         <div class="file-icon ${typeClass}">${getFileIcon(ext)}<span class="ext-ribbon">${ext}</span></div>
         <div class="name">${escapeHtml(file.file_name)}</div>
         <div class="size">${formatSize(file.file_size)}</div>
@@ -1403,6 +1415,8 @@
         }
       });
       card.querySelector('.card-del-btn').onclick = (e) => { e.stopPropagation(); trashFile(file.id, file.file_size); };
+      const cloudContextFn = () => ({ module:'cloud', id: file.id, wrap: card, filePath: file.file_path, fileSize: file.file_size, filename: file.file_name });
+      attachLongPressActions(card, cloudContextFn);
       filesGrid.appendChild(card);
     });
 
@@ -1960,32 +1974,52 @@
     }
   }, true);
 
-  /* ================= Multi-select mode (Chat) ================= */
+  /* ================= Multi-select mode (Chat / Notes / My Cloud) ================= */
   let selectionMode = false;
-  let selectedItems = new Map(); // id -> ctx { type, id, wrap, filePath, fileSize }
+  let selectionModule = null; // 'chat' | 'notes' | 'cloud'
+  let selectedItems = new Map(); // id -> ctx { module, type, id, wrap, filePath, fileSize, filename }
+
+  const SELECTION_CONTAINER_ID = { chat: 'chat-scroll', notes: 'notes-list', cloud: 'cloudFilesGrid' };
+  const SELECTION_CLASS = { chat: 'bubble-selected', notes: 'note-selected', cloud: 'card-selected' };
 
   function enterSelectionMode(ctx){
     selectionMode = true;
+    selectionModule = ctx.module;
     document.getElementById('normalTopbarRow').classList.add('hidden');
     document.getElementById('selectionTopbarRow').classList.remove('hidden');
+    document.getElementById('selectionDownloadBtn').classList.toggle('hidden', ctx.module !== 'cloud');
+    const containerId = SELECTION_CONTAINER_ID[ctx.module];
+    if(containerId){
+      const el = document.getElementById(containerId);
+      if(el) el.classList.add('selection-active');
+    }
     toggleSelectItem(ctx);
   }
 
   function exitSelectionMode(){
     selectionMode = false;
-    selectedItems.forEach(ctx => ctx.wrap.classList.remove('bubble-selected'));
+    selectedItems.forEach(ctx => ctx.wrap.classList.remove(SELECTION_CLASS[ctx.module]));
     selectedItems.clear();
+    if(selectionModule){
+      const containerId = SELECTION_CONTAINER_ID[selectionModule];
+      if(containerId){
+        const el = document.getElementById(containerId);
+        if(el) el.classList.remove('selection-active');
+      }
+    }
+    selectionModule = null;
     document.getElementById('selectionTopbarRow').classList.add('hidden');
     document.getElementById('normalTopbarRow').classList.remove('hidden');
   }
 
   function toggleSelectItem(ctx){
+    const selClass = SELECTION_CLASS[ctx.module];
     if(selectedItems.has(ctx.id)){
       selectedItems.delete(ctx.id);
-      ctx.wrap.classList.remove('bubble-selected');
+      ctx.wrap.classList.remove(selClass);
     } else {
       selectedItems.set(ctx.id, ctx);
-      ctx.wrap.classList.add('bubble-selected');
+      ctx.wrap.classList.add(selClass);
     }
     if(selectedItems.size === 0){ exitSelectionMode(); return; }
     document.getElementById('selectionCountLabel').textContent = selectedItems.size + ' selected';
@@ -1996,19 +2030,51 @@
     if(!items.length) return;
     _confirmOpenedAt = Date.now();
     if(!(await showConfirm(`This will permanently delete ${items.length} item(s).`, 'Delete selected?'))) return;
-    for(const ctx of items){
-      if(ctx.type === 'text'){
-        await deleteVaultItem(ctx.id, ctx.wrap);
-      } else {
-        await deleteVaultItem(ctx.id, ctx.wrap, ctx.filePath, ctx.fileSize);
+
+    if(selectionModule === 'chat'){
+      for(const ctx of items){
+        if(ctx.type === 'text'){ await deleteVaultItem(ctx.id, ctx.wrap); }
+        else { await deleteVaultItem(ctx.id, ctx.wrap, ctx.filePath, ctx.fileSize); }
       }
+    } else if(selectionModule === 'notes'){
+      const ids = items.map(i => i.id);
+      const { error } = await sb.from('notes').delete().in('id', ids);
+      if(error){ showToast('Could not delete notes'); }
+      notesCache = notesCache.filter(n => !ids.includes(n.id));
+      renderNotesList();
+    } else if(selectionModule === 'cloud'){
+      for(const ctx of items){
+        await sb.from('cloud_files').update({ is_trashed: true }).eq('id', ctx.id);
+      }
+      loadCloudView();
     }
+    showToast(items.length + ' item(s) deleted');
+    exitSelectionMode();
+  }
+
+  async function downloadSelectedItems(){
+    if(selectionModule !== 'cloud') return;
+    const items = Array.from(selectedItems.values());
+    if(!items.length) return;
+    let count = 0;
+    for(const ctx of items){
+      count++;
+      showToast(`Downloading ${count}/${items.length}…`);
+      await downloadFile('cloud-files', ctx.filePath, ctx.filename, { innerHTML:'', disabled:false });
+    }
+    showToast(`Downloaded ${count} file(s)`);
     exitSelectionMode();
   }
 
   function attachLongPressActions(el, contextFn){
     let pressTimer = null;
     let firedByLongPress = false;
+
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const ctx = contextFn();
+      if(!selectionMode){ enterSelectionMode(ctx); } else { toggleSelectItem(ctx); }
+    });
 
     el.addEventListener('touchstart', () => {
       firedByLongPress = false;
@@ -2025,9 +2091,9 @@
     // the bubble's normal action (download/preview/copy). Also swallows the synthetic
     // click that follows a long-press on touch devices, so it doesn't double-toggle.
     el.addEventListener('click', (e) => {
-      if(firedByLongPress){ firedByLongPress = false; e.stopPropagation(); e.preventDefault(); return; }
+      if(firedByLongPress){ firedByLongPress = false; e.stopImmediatePropagation(); e.preventDefault(); return; }
       if(selectionMode){
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         e.preventDefault();
         toggleSelectItem(contextFn());
       }
