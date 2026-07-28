@@ -295,6 +295,12 @@
     background:var(--surface); border: 1px solid var(--border); padding:6px 14px; border-radius:100px; font-weight:600;
     margin:12px 0 8px; box-shadow: var(--shadow-sm);
   }
+  .bubble-selected{
+    outline: 2.5px solid var(--accent);
+    outline-offset: 2px;
+    opacity: 0.9;
+    border-radius: 14px;
+  }
   .bubble{
     align-self:flex-end;
     max-width:75%;
