@@ -914,14 +914,44 @@
   }
 
   function handleFileSelect(event){
-    const file = event.target.files[0];
+    const files = Array.from(event.target.files || []);
     event.target.value = '';
-    if(!file) return;
-    if(file.size > MAX_FILE_SIZE){
-      showToast('File too large — max 300MB');
+    if(!files.length) return;
+
+    if(files.length === 1){
+      const file = files[0];
+      if(file.size > MAX_FILE_SIZE){
+        showToast('File too large — max 300MB');
+        return;
+      }
+      setStagedFile(file);
       return;
     }
-    setStagedFile(file);
+
+    const oversized = files.filter(f => f.size > MAX_FILE_SIZE);
+    const valid = files.filter(f => f.size <= MAX_FILE_SIZE);
+    if(oversized.length){
+      showToast(oversized.length + ' file(s) skipped — over 300MB limit');
+    }
+    if(valid.length) sendMultipleFiles(valid);
+  }
+
+  async function sendMultipleFiles(files){
+    const sendBtn = document.getElementById('sendBtn');
+    sendBtn.disabled = true;
+    let sentCount = 0;
+    for(const file of files){
+      sentCount++;
+      showToast(`Sending ${sentCount}/${files.length}…`);
+      try{
+        stagedSendAsDocument = false;
+        await sendFileMessage(file, '');
+      } catch(err){
+        showToast((err.message || 'Send failed') + ` (${file.name})`);
+      }
+    }
+    sendBtn.disabled = false;
+    showToast(`Sent ${sentCount}/${files.length} file(s)`);
   }
 
   let stagedSendAsDocument = false;
@@ -1071,9 +1101,11 @@
   }
 
   let _textPreviewCtx = null; // { bucket, path, filename, table, id }
+  let _textPreviewOriginal = '';
 
   function openTextPreview(bucket, path, filename, table, id){
     _textPreviewCtx = { bucket, path, filename, table, id };
+    _textPreviewOriginal = '';
 
     const nameEl = document.getElementById('textPreviewName');
     nameEl.textContent = filename;
@@ -1093,6 +1125,7 @@
       try{
         const res = await fetch(data.signedUrl);
         ta.value = await res.text();
+        _textPreviewOriginal = ta.value;
       } catch(e){
         showToast('Could not load file');
       } finally {
@@ -1106,9 +1139,15 @@
     document.getElementById('textPreviewArea').value = '';
     cancelTextPreviewRename();
     _textPreviewCtx = null;
+    _textPreviewOriginal = '';
   }
 
-  function closeTextPreview(){
+  async function closeTextPreview(){
+    const ta = document.getElementById('textPreviewArea');
+    if(!ta.disabled && ta.value !== _textPreviewOriginal){
+      const ok = await showConfirm('Changes you made will be lost. Close anyway?', 'Unsaved changes', 'Discard');
+      if(!ok) return;
+    }
     dismissTop();
   }
 
@@ -1127,6 +1166,7 @@
       await sb.from(table).update({ file_size: blob.size }).eq('id', id);
       calculateAndUpdateStorage();
     }
+    _textPreviewOriginal = text;
     showToast('Saved');
   }
 
@@ -1920,27 +1960,78 @@
     }
   }, true);
 
-  function attachLongPressActions(el, contextFn){
-    let pressTimer = null;
-    let firedByLongPress = false;
+  /* ================= Multi-select mode (Chat) ================= */
+  let selectionMode = false;
+  let selectedItems = new Map(); // id -> ctx { type, id, wrap, filePath, fileSize }
 
-    async function triggerDelete(){
-      const ctx = contextFn();
-      _confirmOpenedAt = Date.now();
-      if(!(await showConfirm('This will be permanently deleted.', 'Delete this?'))) return;
+  function enterSelectionMode(ctx){
+    selectionMode = true;
+    document.getElementById('normalTopbarRow').classList.add('hidden');
+    document.getElementById('selectionTopbarRow').classList.remove('hidden');
+    toggleSelectItem(ctx);
+  }
+
+  function exitSelectionMode(){
+    selectionMode = false;
+    selectedItems.forEach(ctx => ctx.wrap.classList.remove('bubble-selected'));
+    selectedItems.clear();
+    document.getElementById('selectionTopbarRow').classList.add('hidden');
+    document.getElementById('normalTopbarRow').classList.remove('hidden');
+  }
+
+  function toggleSelectItem(ctx){
+    if(selectedItems.has(ctx.id)){
+      selectedItems.delete(ctx.id);
+      ctx.wrap.classList.remove('bubble-selected');
+    } else {
+      selectedItems.set(ctx.id, ctx);
+      ctx.wrap.classList.add('bubble-selected');
+    }
+    if(selectedItems.size === 0){ exitSelectionMode(); return; }
+    document.getElementById('selectionCountLabel').textContent = selectedItems.size + ' selected';
+  }
+
+  async function deleteSelectedItems(){
+    const items = Array.from(selectedItems.values());
+    if(!items.length) return;
+    _confirmOpenedAt = Date.now();
+    if(!(await showConfirm(`This will permanently delete ${items.length} item(s).`, 'Delete selected?'))) return;
+    for(const ctx of items){
       if(ctx.type === 'text'){
         await deleteVaultItem(ctx.id, ctx.wrap);
       } else {
         await deleteVaultItem(ctx.id, ctx.wrap, ctx.filePath, ctx.fileSize);
       }
     }
+    exitSelectionMode();
+  }
+
+  function attachLongPressActions(el, contextFn){
+    let pressTimer = null;
+    let firedByLongPress = false;
 
     el.addEventListener('touchstart', () => {
       firedByLongPress = false;
-      pressTimer = setTimeout(() => { firedByLongPress = true; triggerDelete(); }, 480);
+      pressTimer = setTimeout(() => {
+        firedByLongPress = true;
+        const ctx = contextFn();
+        if(!selectionMode){ enterSelectionMode(ctx); } else { toggleSelectItem(ctx); }
+      }, 480);
     }, { passive:true });
     el.addEventListener('touchend', () => clearTimeout(pressTimer));
     el.addEventListener('touchmove', () => clearTimeout(pressTimer));
+
+    // Capture-phase click: while in selection mode, taps toggle selection instead of
+    // the bubble's normal action (download/preview/copy). Also swallows the synthetic
+    // click that follows a long-press on touch devices, so it doesn't double-toggle.
+    el.addEventListener('click', (e) => {
+      if(firedByLongPress){ firedByLongPress = false; e.stopPropagation(); e.preventDefault(); return; }
+      if(selectionMode){
+        e.stopPropagation();
+        e.preventDefault();
+        toggleSelectItem(contextFn());
+      }
+    }, true);
   }
 
   /* ================= Desktop Hover Menus & Clipboard copy ================= */
@@ -1967,6 +2058,7 @@
     if(ctx.type === 'text'){
       html += '<button data-act="copy">Copy</button>';
     }
+    html += '<button data-act="select">Select</button>';
     html += '<button data-act="delete" class="danger">Delete</button>';
     menu.innerHTML = html;
     document.body.appendChild(menu);
@@ -1995,6 +2087,10 @@
         closeBubbleDropdown();
       };
     }
+    menu.querySelector('[data-act="select"]').onclick = () => {
+      closeBubbleDropdown();
+      if(!selectionMode){ enterSelectionMode(ctx); } else { toggleSelectItem(ctx); }
+    };
 
     _openDropdown = menu;
     setTimeout(() => document.addEventListener('click', closeBubbleDropdownOnOutsideClick, true), 0);
