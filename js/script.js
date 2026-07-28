@@ -1046,12 +1046,19 @@
   }
 
   async function openImagePreview(bucket, path, filename){
-    const { data, error } = await sb.storage.from(bucket).createSignedUrl(path, 3600);
-    if(error){ showToast('Could not load image'); return; }
-    document.getElementById('lightboxImg').src = data.signedUrl;
+    const img = document.getElementById('lightboxImg');
+    const spinner = document.getElementById('lightboxSpinner');
+    img.style.display = 'none';
+    img.src = '';
+    spinner.style.display = '';
     document.getElementById('lightboxDlBtn').onclick = () => downloadFile(bucket, path, filename, document.getElementById('lightboxDlBtn'));
     document.getElementById('lightboxModal').classList.remove('hidden');
     pushBackEntry(hideLightbox);
+
+    const { data, error } = await sb.storage.from(bucket).createSignedUrl(path, 3600);
+    if(error){ showToast('Could not load image'); hideLightbox(); return; }
+    img.onload = () => { spinner.style.display = 'none'; img.style.display = ''; };
+    img.src = data.signedUrl;
   }
 
   function hideLightbox(){
@@ -1294,6 +1301,10 @@
 
   async function loadCloudView(){
     if(!currentUser) return;
+    renderCloudBreadcrumb();
+    const gridsWrap = document.getElementById('cloudGridsWrap');
+    gridsWrap.style.opacity = '0.4';
+
     const folderQuery = cloudCurrentFolderId === null
       ? sb.from('cloud_folders').select('*').eq('user_id', currentUser.id).is('parent_folder_id', null)
       : sb.from('cloud_folders').select('*').eq('user_id', currentUser.id).eq('parent_folder_id', cloudCurrentFolderId);
@@ -1302,9 +1313,7 @@
       : sb.from('cloud_files').select('*').eq('user_id', currentUser.id).eq('is_trashed', false).eq('folder_id', cloudCurrentFolderId);
 
     const [{ data: folders, error: fErr }, { data: files, error: fiErr }] = await Promise.all([folderQuery, fileQuery]);
-    if(fErr || fiErr){ showToast('Could not load My Cloud'); return; }
-
-    renderCloudBreadcrumb();
+    if(fErr || fiErr){ showToast('Could not load My Cloud'); gridsWrap.style.opacity = '1'; return; }
 
     const foldersGrid = document.getElementById('cloudFoldersGrid');
     const filesGrid = document.getElementById('cloudFilesGrid');
@@ -1360,6 +1369,7 @@
     foldersSection.classList.toggle('hidden', !folders || folders.length === 0);
     filesSection.classList.toggle('hidden', !files || files.length === 0);
     emptyState.classList.toggle('hidden', (folders && folders.length) || (files && files.length));
+    gridsWrap.style.opacity = '1';
   }
 
   function renderCloudBreadcrumb(){
