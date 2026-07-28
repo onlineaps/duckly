@@ -321,13 +321,15 @@
             <div>Drag files here, or paste with Ctrl+V</div>
           </div>
 
-          <div id="cloudFoldersSection">
-            <div class="grid-label">Folders</div>
-            <div class="grid" id="cloudFoldersGrid"></div>
-          </div>
-          <div id="cloudFilesSection">
-            <div class="grid-label">Files</div>
-            <div class="grid" id="cloudFilesGrid"></div>
+          <div id="cloudGridsWrap" style="transition:opacity 0.15s ease;">
+            <div id="cloudFoldersSection">
+              <div class="grid-label">Folders</div>
+              <div class="grid" id="cloudFoldersGrid"></div>
+            </div>
+            <div id="cloudFilesSection">
+              <div class="grid-label">Files</div>
+              <div class="grid" id="cloudFilesGrid"></div>
+            </div>
           </div>
           <div class="hidden" id="cloudEmptyState" style="text-align:center; color:var(--muted); font-size:14px; margin-top:40px;">
             This folder is empty.
@@ -517,7 +519,8 @@
 
 <div class="modal-overlay hidden" id="lightboxModal" style="background:rgba(15,23,42,0.9); padding:20px;" onclick="if(event.target===this) closeLightbox()">
   <div style="max-width:90vw; max-height:85vh; display:flex; flex-direction:column; align-items:center; gap:16px;">
-    <img id="lightboxImg" style="max-width:90vw; max-height:75vh; border-radius:12px; object-fit:contain; box-shadow: var(--shadow-lg);">
+    <div id="lightboxSpinner" class="spinner" style="width:32px; height:32px; border-width:3px; border-color:rgba(255,255,255,0.25); border-top-color:#fff;"></div>
+    <img id="lightboxImg" style="max-width:90vw; max-height:75vh; border-radius:12px; object-fit:contain; box-shadow: var(--shadow-lg); display:none;">
     <div style="display:flex; gap:12px;">
       <button class="btn btn-primary" id="lightboxDlBtn" style="padding:10px 24px;">Download</button>
       <button class="btn btn-ghost" style="padding:10px 24px; background:rgba(255,255,255,0.1); color:#fff; border-color:rgba(255,255,255,0.2);" onclick="closeLightbox()">Close</button>
