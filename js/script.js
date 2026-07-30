@@ -1351,6 +1351,11 @@
   /* ================= MY CLOUD MODULE ================= */
   let cloudCurrentFolderId = null;
   let cloudFolderStack = [{ id: null, name: 'Home' }];
+  let cloudViewMode = 'grid';
+  try{ cloudViewMode = localStorage.getItem('duckly-cloud-view') || 'grid'; }catch(e){}
+  document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === cloudViewMode);
+  });
 
   async function loadCloudView(){
     if(!currentUser) return;
@@ -1376,56 +1381,118 @@
     foldersGrid.innerHTML = '';
     filesGrid.innerHTML = '';
 
+    const isListMode = cloudViewMode === 'list';
+    foldersGrid.className = isListMode ? 'grid list-mode' : 'grid';
+    filesGrid.className = isListMode ? 'grid list-mode' : 'grid';
+    document.getElementById('cloudListHeader').classList.toggle('hidden', !isListMode || (!folders?.length && !files?.length));
+
     (folders || []).forEach(folder => {
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.innerHTML = `
-        <button class="card-del-btn" title="Delete folder">${TRASH_ICON}</button>
-        <div class="file-icon folder-real">${FOLDER_ICON}</div>
-        <div class="name">${escapeHtml(folder.name)}</div>
-        <div class="size">Folder</div>
-      `;
-      card.addEventListener('click', (e) => {
+      const el = document.createElement('div');
+      if(isListMode){
+        el.className = 'list-row';
+        el.innerHTML = `
+          <button class="card-del-btn" title="Delete folder">${TRASH_ICON}</button>
+          <div class="list-icon folder-real">${FOLDER_ICON}</div>
+          <div class="list-name">${escapeHtml(folder.name)}</div>
+          <div class="list-modified">${formatListDate(folder.created_at)}</div>
+          <div class="list-size">—</div>
+        `;
+      } else {
+        el.className = 'card';
+        el.innerHTML = `
+          <button class="card-del-btn" title="Delete folder">${TRASH_ICON}</button>
+          <div class="file-icon folder-real">${FOLDER_ICON}</div>
+          <div class="name">${escapeHtml(folder.name)}</div>
+          <div class="size">Folder</div>
+        `;
+      }
+      el.addEventListener('click', (e) => {
         if(e.target.closest('.card-del-btn')) return;
         navigateToFolder(folder.id, folder.name);
       });
-      card.querySelector('.card-del-btn').onclick = (e) => { e.stopPropagation(); deleteFolder(folder.id, folder.name); };
-      foldersGrid.appendChild(card);
+      el.querySelector('.card-del-btn').onclick = (e) => { e.stopPropagation(); deleteFolder(folder.id, folder.name); };
+      foldersGrid.appendChild(el);
     });
 
     (files || []).forEach(file => {
       const ext = getExt(file.file_name);
       const typeClass = getTypeClass(ext);
       const isImage = ['jpg','jpeg','png','gif','webp'].includes(ext.toLowerCase());
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.innerHTML = `
-        <button class="card-del-btn" title="Delete file">${TRASH_ICON}</button>
-        <div class="select-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
-        <div class="file-icon ${typeClass}">${getFileIcon(ext)}<span class="ext-ribbon">${ext}</span></div>
-        <div class="name">${escapeHtml(file.file_name)}</div>
-        <div class="size">${formatSize(file.file_size)}</div>
-      `;
-      card.addEventListener('click', (e) => {
+      const el = document.createElement('div');
+      const checkboxHtml = `<div class="select-checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>`;
+      let iconEl;
+      if(isListMode){
+        el.className = 'list-row';
+        el.innerHTML = `
+          <button class="card-del-btn" title="Delete file">${TRASH_ICON}</button>
+          ${checkboxHtml}
+          <div class="list-icon ${typeClass}">${getFileIcon(ext)}</div>
+          <div class="list-name">${escapeHtml(file.file_name)}</div>
+          <div class="list-modified">${formatListDate(file.created_at)}</div>
+          <div class="list-size">${formatSize(file.file_size)}</div>
+        `;
+        iconEl = el.querySelector('.list-icon');
+      } else {
+        el.className = 'card';
+        el.innerHTML = `
+          <button class="card-del-btn" title="Delete file">${TRASH_ICON}</button>
+          ${checkboxHtml}
+          <div class="file-icon ${typeClass}">${getFileIcon(ext)}<span class="ext-ribbon">${ext}</span></div>
+          <div class="name">${escapeHtml(file.file_name)}</div>
+          <div class="size">${formatSize(file.file_size)}</div>
+        `;
+        iconEl = el.querySelector('.file-icon');
+      }
+      if(isImage) loadCloudThumbnail(iconEl, file.file_path);
+      el.addEventListener('click', (e) => {
         if(e.target.closest('.card-del-btn')) return;
         if(isImage){
           openImagePreview('cloud-files', file.file_path, file.file_name);
         } else if(ext.toLowerCase() === 'txt'){
           openTextPreview('cloud-files', file.file_path, file.file_name, 'cloud_files', file.id);
         } else {
-          downloadFile('cloud-files', file.file_path, file.file_name, card.querySelector('.file-icon'));
+          downloadFile('cloud-files', file.file_path, file.file_name, iconEl);
         }
       });
-      card.querySelector('.card-del-btn').onclick = (e) => { e.stopPropagation(); trashFile(file.id, file.file_size); };
-      const cloudContextFn = () => ({ module:'cloud', id: file.id, wrap: card, filePath: file.file_path, fileSize: file.file_size, filename: file.file_name });
-      attachLongPressActions(card, cloudContextFn);
-      filesGrid.appendChild(card);
+      el.querySelector('.card-del-btn').onclick = (e) => { e.stopPropagation(); trashFile(file.id, file.file_size); };
+      const cloudContextFn = () => ({ module:'cloud', id: file.id, wrap: el, filePath: file.file_path, fileSize: file.file_size, filename: file.file_name });
+      attachLongPressActions(el, cloudContextFn);
+      filesGrid.appendChild(el);
     });
 
     foldersSection.classList.toggle('hidden', !folders || folders.length === 0);
     filesSection.classList.toggle('hidden', !files || files.length === 0);
     emptyState.classList.toggle('hidden', (folders && folders.length) || (files && files.length));
     gridsWrap.style.opacity = '1';
+  }
+
+  function formatListDate(iso){
+    if(!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString([], { month:'short', day:'numeric', year:'numeric' });
+  }
+
+  async function loadCloudThumbnail(iconEl, filePath){
+    if(!iconEl) return;
+    const { data, error } = await sb.storage.from('cloud-files').createSignedUrl(filePath, 3600);
+    if(error) return;
+    const img = new Image();
+    img.onload = () => {
+      iconEl.style.backgroundImage = `url(${data.signedUrl})`;
+      iconEl.style.backgroundSize = 'cover';
+      iconEl.style.backgroundPosition = 'center';
+      iconEl.classList.add('has-thumb');
+    };
+    img.src = data.signedUrl;
+  }
+
+  function setCloudViewMode(mode){
+    cloudViewMode = mode;
+    try{ localStorage.setItem('duckly-cloud-view', mode); }catch(e){}
+    document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.view === mode);
+    });
+    loadCloudView();
   }
 
   function renderCloudBreadcrumb(){
