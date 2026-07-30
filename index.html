@@ -334,6 +334,14 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/></svg>
               Trash
             </button>
+            <div class="view-toggle">
+              <button class="view-toggle-btn" data-view="grid" onclick="setCloudViewMode('grid')" title="Grid view">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+              </button>
+              <button class="view-toggle-btn" data-view="list" onclick="setCloudViewMode('list')" title="List view">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+              </button>
+            </div>
           </div>
           <input type="file" id="cloudFileInput" multiple style="display:none" onchange="handleCloudFileSelect(event)">
           <input type="file" id="cloudFolderInput" webkitdirectory directory multiple style="display:none" onchange="handleCloudFolderSelect(event)">
@@ -342,6 +350,12 @@
             <div>Drag files here, or paste with Ctrl+V</div>
           </div>
 
+          <div class="list-header hidden" id="cloudListHeader">
+            <div style="flex:1;">Name</div>
+            <div style="width:110px;">Modified</div>
+            <div style="width:70px; text-align:right;">Size</div>
+            <div style="width:34px;"></div>
+          </div>
           <div id="cloudGridsWrap" style="transition:opacity 0.15s ease;">
             <div id="cloudFoldersSection">
               <div class="grid-label">Folders</div>
