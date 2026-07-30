@@ -8,7 +8,9 @@
 /* ================= SUPABASE SETUP ================= */
   const SUPABASE_URL = 'https://scqxxjclhhhufjmnxogx.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjcXh4amNsaGhodWZqbW54b2d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MTMyMzAsImV4cCI6MjA5OTE4OTIzMH0.6NXsrPDLTr1gNc78WTNa33V3AFrJWDhWgMzoUcVE7wk';
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true }
+  });
   const EMAIL_DOMAIN = '@gmail.com';
   const EMAIL_TAG = '+ducklyapp';
 
@@ -1490,32 +1492,120 @@
     loadCloudView();
   }
 
-  function handleCloudFileSelect(event){
-    const file = event.target.files[0];
-    event.target.value = '';
-    if(file) uploadCloudFile(file);
+  function toggleCloudUploadMenu(e){
+    e.stopPropagation();
+    const menu = document.getElementById('cloudUploadMenu');
+    menu.classList.toggle('hidden');
   }
 
-  async function uploadCloudFile(file){
-    if(file.size > MAX_FILE_SIZE){ showToast('File too large — max 300MB'); return; }
-    if(totalUsedBytes + file.size > TOTAL_QUOTA){ showToast('Storage full — delete some files first'); return; }
+  function closeCloudUploadMenu(){
+    document.getElementById('cloudUploadMenu').classList.add('hidden');
+  }
 
-    const path = currentUser.id + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('cloudUploadMenu');
+    if(!menu || menu.classList.contains('hidden')) return;
+    if(!e.target.closest('#cloudUploadMenu') && !e.target.closest('.cloud-actions')) closeCloudUploadMenu();
+  });
+
+  document.getElementById('cloudUploadMenu').querySelector('[data-act="files"]').onclick = () => {
+    closeCloudUploadMenu();
+    document.getElementById('cloudFileInput').click();
+  };
+  document.getElementById('cloudUploadMenu').querySelector('[data-act="folder"]').onclick = () => {
+    closeCloudUploadMenu();
+    document.getElementById('cloudFolderInput').click();
+  };
+
+  function handleCloudFileSelect(event){
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if(!files.length) return;
+    uploadCloudFilesBatch(files);
+  }
+
+  function handleCloudFolderSelect(event){
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if(!files.length) return;
+    uploadFolderTree(files);
+  }
+
+  async function uploadCloudFile(file, opts){
+    opts = opts || {};
+    const silent = opts.silent || false;
+    const folderId = (opts.folderId !== undefined) ? opts.folderId : cloudCurrentFolderId;
+
+    if(file.size > MAX_FILE_SIZE){ showToast('Too large, skipped: ' + file.name); return false; }
+    if(totalUsedBytes + file.size > TOTAL_QUOTA){ showToast('Storage full — stopped at: ' + file.name); return false; }
+
+    const path = currentUser.id + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,7) + '_' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
     const { error: uploadErr } = await sb.storage.from('cloud-files').upload(path, file);
-    if(uploadErr){ showToast('Upload failed'); return; }
+    if(uploadErr){ showToast('Upload failed: ' + file.name); return false; }
 
     const { error } = await sb.from('cloud_files').insert({
-      user_id: currentUser.id, folder_id: cloudCurrentFolderId,
+      user_id: currentUser.id, folder_id: folderId,
       file_name: file.name, file_path: path, file_size: file.size
     });
-    if(error){ showToast('Could not save file record'); return; }
+    if(error){ showToast('Could not save file record: ' + file.name); return false; }
 
-    showToast('Uploaded');
+    totalUsedBytes += file.size;
+
+    if(!silent){
+      showToast('Uploaded');
+      await loadCloudView();
+      await calculateAndUpdateStorage();
+      if(totalUsedBytes / TOTAL_QUOTA >= 0.9){
+        showToast('Storage almost full — consider deleting old files');
+      }
+    }
+    return true;
+  }
+
+  async function uploadCloudFilesBatch(files){
+    if(!files.length) return;
+    let count = 0;
+    for(const file of files){
+      count++;
+      showToast(`Uploading ${count}/${files.length}…`);
+      await uploadCloudFile(file, { silent:true });
+    }
+    showToast(`Uploaded ${count} file(s)`);
     await loadCloudView();
     await calculateAndUpdateStorage();
-    if(totalUsedBytes / TOTAL_QUOTA >= 0.9){
-      showToast('Storage almost full — consider deleting old files');
+  }
+
+  async function uploadFolderTree(files){
+    if(!files.length) return;
+    const folderIdCache = new Map();
+    folderIdCache.set('', cloudCurrentFolderId);
+
+    async function resolveFolderId(dirPath){
+      if(folderIdCache.has(dirPath)) return folderIdCache.get(dirPath);
+      const parts = dirPath.split('/');
+      const folderName = parts[parts.length - 1];
+      const parentPath = parts.slice(0, -1).join('/');
+      const parentId = await resolveFolderId(parentPath);
+      const { data, error } = await sb.from('cloud_folders')
+        .insert({ user_id: currentUser.id, name: folderName, parent_folder_id: parentId })
+        .select().single();
+      const resolvedId = error ? parentId : data.id;
+      folderIdCache.set(dirPath, resolvedId);
+      return resolvedId;
     }
+
+    let count = 0;
+    for(const file of files){
+      count++;
+      showToast(`Uploading ${count}/${files.length}…`);
+      const relPath = file.webkitRelativePath || file.name;
+      const dirPath = relPath.split('/').slice(0, -1).join('/');
+      const folderId = await resolveFolderId(dirPath);
+      await uploadCloudFile(file, { silent:true, folderId });
+    }
+    showToast(`Uploaded ${count} file(s)`);
+    await loadCloudView();
+    await calculateAndUpdateStorage();
   }
 
   async function trashFile(id, fileSize){
@@ -1600,16 +1690,16 @@
       zone.addEventListener(evt, (e) => { e.preventDefault(); zone.style.borderColor = ''; zone.style.backgroundColor = ''; });
     });
     zone.addEventListener('drop', (e) => {
-      const file = e.dataTransfer.files[0];
-      if(file) uploadCloudFile(file);
+      const files = Array.from(e.dataTransfer.files || []);
+      if(files.length) uploadCloudFilesBatch(files);
     });
 
     document.addEventListener('paste', (e) => {
       if(TAB_ORDER[currentTabIndex] !== 'cloud') return;
       if(document.activeElement && ['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
-      const files = e.clipboardData && e.clipboardData.files;
+      const files = e.clipboardData && Array.from(e.clipboardData.files || []);
       if(files && files.length > 0){
-        uploadCloudFile(files[0]);
+        uploadCloudFilesBatch(files);
       }
     });
   }
