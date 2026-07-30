@@ -320,16 +320,23 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
               New folder
             </button>
-            <button class="btn btn-ghost" onclick="document.getElementById('cloudFileInput').click()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>
-              Upload
-            </button>
+            <div style="position:relative;">
+              <button class="btn btn-ghost" onclick="toggleCloudUploadMenu(event)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>
+                Upload
+              </button>
+              <div class="bubble-dropdown hidden" id="cloudUploadMenu" style="top:calc(100% + 6px); left:0;">
+                <button data-act="files">Upload files</button>
+                <button data-act="folder">Upload folder</button>
+              </div>
+            </div>
             <button class="btn btn-ghost" onclick="openTrashView()" style="margin-left:auto;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/></svg>
               Trash
             </button>
           </div>
-          <input type="file" id="cloudFileInput" style="display:none" onchange="handleCloudFileSelect(event)">
+          <input type="file" id="cloudFileInput" multiple style="display:none" onchange="handleCloudFileSelect(event)">
+          <input type="file" id="cloudFolderInput" webkitdirectory directory multiple style="display:none" onchange="handleCloudFolderSelect(event)">
           <div class="dropzone" id="cloudDropzone">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>
             <div>Drag files here, or paste with Ctrl+V</div>
